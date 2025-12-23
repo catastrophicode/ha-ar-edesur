@@ -425,7 +425,7 @@ class EdesurApiClient:
             "requestkey": "cuentaContrato",
             "tipovalidacion": "route-hash-cliente",
             "tipologueo": "interno",
-            "x-origin-channel": "Wbns-RgKfqY~",
+            "x-origin-channel": self.encryptor.encrypt("CAN001", double_tilde=False),
         }
 
         response = await self._request("GET", url, headers=headers)
@@ -462,7 +462,7 @@ class EdesurApiClient:
             "requestkey": "cuentaContrato",
             "tipovalidacion": "route-hash-cliente",
             "tipologueo": "interno",
-            "x-origin-channel": "Wbns-RgKfqY~",
+            "x-origin-channel": self.encryptor.encrypt("CAN001", double_tilde=False),
         }
 
         return await self._request("GET", url, headers=headers)
@@ -493,7 +493,7 @@ class EdesurApiClient:
             "requestkey": "nroSuministro",
             "tipovalidacion": "body-hash-cliente",
             "tipologueo": "interno",
-            "x-origin-channel": "Wbns-RgKfqY~",
+            "x-origin-channel": self.encryptor.encrypt("CAN001", double_tilde=False),
         }
 
         _LOGGER.debug("Getting debt for supply %s", supply_id)
@@ -541,7 +541,7 @@ class EdesurApiClient:
             "requestkey": "nroSuministro",
             "tipovalidacion": "route-hash-cliente",
             "tipologueo": "interno",
-            "x-origin-channel": "Wbns-RgKfqY~",
+            "x-origin-channel": self.encryptor.encrypt("CAN001", double_tilde=False),
         }
 
         return await self._request("GET", url, headers=headers)
