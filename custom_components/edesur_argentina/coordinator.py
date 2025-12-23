@@ -192,27 +192,16 @@ class EdesurGlobalOutageCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             _LOGGER.debug("Updating global outage data")
 
-            # Fetch global outage data in parallel
-            scheduled_task = self.client.get_scheduled_outages()
-            current_task = self.client.get_current_outages()
-
-            scheduled, current = await asyncio.gather(
-                scheduled_task,
-                current_task,
-                return_exceptions=True,
-            )
+            # Fetch current outages only (scheduled outages endpoint is unreliable)
+            try:
+                current = await self.client.get_current_outages()
+            except Exception as err:
+                _LOGGER.warning("Failed to fetch current outages: %s", err)
+                current = ""
 
             data = {
-                "scheduled_outages": {} if isinstance(scheduled, Exception) else scheduled,
-                "current_outages": "" if isinstance(current, Exception) else current,
+                "current_outages": current,
             }
-
-            # Log errors but don't fail
-            if isinstance(scheduled, Exception):
-                _LOGGER.warning("Failed to fetch scheduled outages: %s", scheduled)
-
-            if isinstance(current, Exception):
-                _LOGGER.warning("Failed to fetch current outages: %s", current)
 
             _LOGGER.debug("Successfully updated global outage data")
             return data
@@ -222,7 +211,6 @@ class EdesurGlobalOutageCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Global outage update was cancelled")
             # Return empty data instead of failing
             return {
-                "scheduled_outages": {},
                 "current_outages": "",
             }
 

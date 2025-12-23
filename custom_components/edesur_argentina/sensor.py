@@ -33,7 +33,6 @@ from .const import (
     SENSOR_CUSTOMER_NAME,
     SENSOR_DUE_DATE,
     SENSOR_LAST_OUTAGE,
-    SENSOR_SCHEDULED_OUTAGES,
     SENSOR_TOTAL_DEBT,
 )
 from .coordinator import EdesurGlobalOutageCoordinator, EdesurSupplyCoordinator
@@ -75,7 +74,6 @@ async def async_setup_entry(
     entities.extend(
         [
             EdesurCurrentOutagesSensor(outage_coordinator),
-            EdesurScheduledOutagesSensor(outage_coordinator),
         ]
     )
 
@@ -564,66 +562,3 @@ class EdesurCurrentOutagesSensor(EdesurGlobalSensorBase):
         return attrs
 
 
-class EdesurScheduledOutagesSensor(EdesurGlobalSensorBase):
-    """Sensor for scheduled outages."""
-
-    def __init__(self, coordinator: EdesurGlobalOutageCoordinator) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, SENSOR_SCHEDULED_OUTAGES)
-        self._attr_name = "Edesur Scheduled Outages"
-        self._attr_icon = "mdi:calendar-alert"
-
-    @property
-    def native_value(self) -> int:
-        """Return the state of the sensor."""
-        if not self.coordinator.data:
-            return 0
-
-        scheduled = self.coordinator.data.get("scheduled_outages", {})
-
-        # Count scheduled outages
-        if isinstance(scheduled, dict):
-            outages = (
-                scheduled.get("cortesProgramados")
-                or scheduled.get("outages")
-                or scheduled.get("data")
-                or []
-            )
-
-            if isinstance(outages, list):
-                return len(outages)
-
-        return 0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        attrs = {}
-
-        if self.coordinator.data:
-            scheduled = self.coordinator.data.get("scheduled_outages", {})
-
-            if isinstance(scheduled, dict):
-                outages = (
-                    scheduled.get("cortesProgramados")
-                    or scheduled.get("outages")
-                    or scheduled.get("data")
-                    or []
-                )
-
-                # Add outage details
-                if isinstance(outages, list) and outages:
-                    attrs["outages"] = [
-                        {
-                            "area": outage.get("zona") or outage.get("area"),
-                            "start": outage.get("fechaInicio")
-                            or outage.get("startDate"),
-                            "end": outage.get("fechaFin") or outage.get("endDate"),
-                            "reason": outage.get("motivo") or outage.get("reason"),
-                        }
-                        for outage in outages[:10]  # Limit to first 10
-                    ]
-
-            attrs[ATTR_LAST_UPDATE] = datetime.now().isoformat()
-
-        return attrs

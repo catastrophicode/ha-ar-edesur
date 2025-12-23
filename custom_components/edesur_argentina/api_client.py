@@ -112,6 +112,7 @@ class EdesurApiClient:
         json_data: Optional[dict[str, Any]] = None,
         params: Optional[dict[str, str]] = None,
         retry_count: int = 0,
+        timeout_seconds: Optional[int] = None,
     ) -> dict[str, Any]:
         """Make an HTTP request with retry logic.
 
@@ -122,6 +123,7 @@ class EdesurApiClient:
             json_data: Optional JSON payload
             params: Optional query parameters
             retry_count: Current retry attempt
+            timeout_seconds: Optional custom timeout in seconds
 
         Returns:
             JSON response data
@@ -139,7 +141,7 @@ class EdesurApiClient:
         if self._token and "Authorization" not in request_headers:
             request_headers["Authorization"] = f"Bearer {self._token}"
 
-        timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
+        timeout = ClientTimeout(total=timeout_seconds or DEFAULT_TIMEOUT)
 
         try:
             # Log full request details
@@ -166,8 +168,23 @@ class EdesurApiClient:
                 _LOGGER.info("=" * 80)
                 # Handle authentication errors
                 if response.status == 401:
-                    _LOGGER.warning("Authentication failed (401)")
-                    raise EdesurAuthError(ERROR_AUTH_FAILED)
+                    # Only retry authentication once to avoid infinite loops
+                    if retry_count == 0 and self._token:
+                        _LOGGER.warning("Token expired (401), attempting reauthentication")
+                        try:
+                            # Re-authenticate to get a fresh token
+                            await self.authenticate()
+                            _LOGGER.info("Reauthentication successful, retrying request")
+                            # Retry the request with the new token
+                            return await self._request(
+                                method, url, headers, json_data, params, retry_count + 1, timeout_seconds
+                            )
+                        except Exception as auth_err:
+                            _LOGGER.error("Reauthentication failed: %s", auth_err)
+                            raise EdesurAuthError(ERROR_AUTH_FAILED) from auth_err
+                    else:
+                        _LOGGER.warning("Authentication failed (401)")
+                        raise EdesurAuthError(ERROR_AUTH_FAILED)
 
                 # Handle server errors with retry
                 if response.status >= 500:
@@ -221,7 +238,7 @@ class EdesurApiClient:
                 )
                 await asyncio.sleep(RETRY_DELAY)
                 return await self._request(
-                    method, url, headers, json_data, params, retry_count + 1
+                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds
                 )
             raise EdesurTimeoutError(ERROR_TIMEOUT) from err
 
@@ -554,7 +571,8 @@ class EdesurApiClient:
         """
         _LOGGER.debug("Getting scheduled outages")
 
-        return await self._request("GET", API_SCHEDULED_OUTAGES)
+        # Use longer timeout (60s) for this endpoint as it can be slow
+        return await self._request("GET", API_SCHEDULED_OUTAGES, timeout_seconds=60)
 
     async def get_current_outages(self) -> str:
         """Get current outages from ENRE (public endpoint).
@@ -570,7 +588,8 @@ class EdesurApiClient:
         try:
             # The ENRE endpoint has SSL/TLS issues
             # Use the module-level SSL context to avoid blocking calls
-            timeout = ClientTimeout(total=DEFAULT_TIMEOUT)
+            # Use longer timeout (60s) as this is an external endpoint
+            timeout = ClientTimeout(total=60)
 
             async with aiohttp.ClientSession() as temp_session:
                 async with temp_session.request(

@@ -71,11 +71,6 @@ Each electricity supply creates a device named "Edesur Argentina [account_number
   - Attributes: List of affected areas
   - Icon: mdi:power-plug-off-outline
 
-- **Edesur Scheduled Outages** (`sensor.edesur_argentina_global_scheduled_outages`)
-  - State: Number of scheduled outages
-  - Attributes: Details of upcoming scheduled outages
-  - Icon: mdi:calendar-alert
-
 ## Installation
 
 ### HACS (Recommended)
@@ -146,7 +141,6 @@ To configure options:
 ### Public Endpoints
 
 - `GET https://www.enre.gov.ar/paginacorte/js/data_EDS.js` - Current outages
-- `GET /api/utils/outage-report` - Scheduled outages
 
 ## Security
 
@@ -265,6 +259,9 @@ Use at your own risk. The authors are not responsible for any issues arising fro
 - ✅ Spanish translations for UI elements
 - ✅ Pre-populated supply selection during reconfiguration
 - ✅ Fixed encryptor attribute inconsistency in API client
+- ✅ Automatic token refresh on 401 authentication errors
+- ✅ Removed unreliable scheduled outages endpoint
+- ✅ Increased timeout for slow outage endpoints (60s)
 
 ### Version 1.0.0 (Initial Release)
 - ✅ Multi-supply monitoring
