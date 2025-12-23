@@ -9,11 +9,13 @@ Home Assistant custom integration for monitoring Edesur Argentina electricity su
 ## Features
 
 - **Multi-Supply Support**: Monitor multiple electricity supplies from a single account
+- **Reconfigurable Supply Selection**: Add or remove supplies after initial setup
 - **Account Monitoring**: Track account status, debt, and payment due dates
 - **Outage Detection**: Real-time monitoring of service cuts and outages
 - **Global Outage Information**: View current and scheduled outages across the network
 - **Automatic Reauthentication**: Seamlessly handles token expiration
 - **Configurable Update Intervals**: Customize polling frequency for supplies and outages
+- **Multi-Language Support**: Available in English and Spanish
 - **Robust Error Handling**: Automatic retries and graceful degradation
 
 ## Sensors
@@ -106,16 +108,27 @@ Each electricity supply creates a device named "Edesur Argentina [account_number
 5. Select which supplies you want to monitor
 6. Click **Submit** to complete setup
 
+### Reconfiguring Supply Selection
+
+You can add or remove supplies after initial setup:
+
+1. Go to **Settings** → **Devices & Services**
+2. Find the Edesur Argentina integration
+3. Click the three dots menu (⋮)
+4. Select **Reconfigure**
+5. Update your supply selection
+6. Click **Submit** - the integration will reload with your new selection
+
 ### Options
 
-After setup, you can configure:
+After setup, you can configure polling intervals:
 
 - **Scan Interval**: How often to update supply data (default: 30 minutes)
 - **Outage Scan Interval**: How often to check for outages (default: 5 minutes)
 
 To configure options:
 1. Go to **Settings** → **Devices & Services**
-2. Find the Edesur integration
+2. Find the Edesur Argentina integration
 3. Click **Configure**
 
 ## API Endpoints Used
@@ -217,37 +230,11 @@ custom_components/edesur_argentina/
 ├── api_client.py        # Edesur API client
 ├── coordinator.py       # Data update coordinators
 ├── sensor.py           # Sensor platform
-└── binary_sensor.py    # Binary sensor platform
+├── binary_sensor.py    # Binary sensor platform
+└── translations/        # UI translations
+    ├── en.json          # English translations
+    └── es.json          # Spanish translations
 ```
-
-## Future Improvements
-
-### Potential Enhancements
-1. **Historical Data**: Track debt and consumption over time with long-term statistics
-2. **Consumption Tracking**: Add sensors for electricity consumption if API provides this data
-3. **Bill Download**: Download PDF bills directly from the integration
-4. **Payment Integration**: Link to payment methods or show payment history
-5. **Service Area Map**: Display affected outage areas on a map
-6. **Consumption Forecasting**: Predict future consumption and costs
-7. **Energy Dashboard Integration**: Integrate with Home Assistant Energy dashboard
-8. **Multi-Language Support**: Add Spanish translations for UI elements
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Contribution Ideas
-
-- **API Documentation**: Document additional API endpoints
-- **Translations**: Add Spanish language support
-- **Bug Fixes**: Report and fix issues
-- **Feature Enhancements**: Implement features from the Future Improvements list
 
 ## License
 
@@ -272,6 +259,11 @@ Use at your own risk. The authors are not responsible for any issues arising fro
 - **Home Assistant Community**: [Community Forum](https://community.home-assistant.io/)
 
 ## Changelog
+
+### Version 1.1.0
+- ✅ Reconfigure flow to add/remove supplies after initial setup
+- ✅ Spanish translations for UI elements
+- ✅ Pre-populated supply selection during reconfiguration
 
 ### Version 1.0.0 (Initial Release)
 - ✅ Multi-supply monitoring

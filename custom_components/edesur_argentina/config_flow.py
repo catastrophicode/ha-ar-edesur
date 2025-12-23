@@ -38,6 +38,7 @@ class EdesurConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._password: Optional[str] = None
         self._client: Optional[EdesurApiClient] = None
         self._supplies: list[dict[str, Any]] = []
+        self._reauth_entry: Optional[config_entries.ConfigEntry] = None
 
     async def async_step_user(
         self, user_input: Optional[dict[str, Any]] = None
@@ -136,8 +137,13 @@ class EdesurConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=self._get_supply_schema(),
         )
 
-    def _get_supply_schema(self) -> vol.Schema:
+    def _get_supply_schema(
+        self, default_supplies: Optional[list[str]] = None
+    ) -> vol.Schema:
         """Generate schema for supply selection.
+
+        Args:
+            default_supplies: List of supply IDs to pre-select
 
         Returns:
             Voluptuous schema for supply selection
@@ -160,10 +166,83 @@ class EdesurConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             supply_options[supply_id] = label
 
+        # Build the schema with optional defaults
+        if default_supplies:
+            return vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SELECTED_SUPPLIES, default=default_supplies
+                    ): cv.multi_select(supply_options),
+                }
+            )
         return vol.Schema(
             {
                 vol.Required(CONF_SELECTED_SUPPLIES): cv.multi_select(supply_options),
             }
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: Optional[dict[str, Any]] = None
+    ) -> FlowResult:
+        """Handle reconfiguration to add/remove supplies.
+
+        Args:
+            user_input: User selected supplies
+
+        Returns:
+            Flow result
+        """
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            selected = user_input.get(CONF_SELECTED_SUPPLIES, [])
+
+            if not selected:
+                errors["base"] = "no_supplies_selected"
+            else:
+                # Update the config entry with new supply selection
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry,
+                    data_updates={CONF_SELECTED_SUPPLIES: selected},
+                )
+
+        # Fetch current credentials from entry
+        self._email = reconfigure_entry.data[CONF_EMAIL]
+        self._password = reconfigure_entry.data[CONF_PASSWORD]
+
+        # Fetch available supplies
+        try:
+            async with EdesurApiClient(
+                email=self._email,
+                password=self._password,
+            ) as client:
+                await client.authenticate()
+                self._supplies = await client.get_supplies()
+
+            if not self._supplies:
+                errors["base"] = "no_supplies"
+
+        except EdesurAuthError:
+            errors["base"] = ERROR_AUTH_FAILED
+
+        except EdesurConnectionError:
+            errors["base"] = ERROR_CANNOT_CONNECT
+
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.exception("Unexpected error during reconfigure: %s", err)
+            errors["base"] = ERROR_UNKNOWN
+
+        # Get currently selected supplies to pre-populate form
+        current_supplies = reconfigure_entry.data.get(CONF_SELECTED_SUPPLIES, [])
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self._get_supply_schema(current_supplies),
+            errors=errors,
+            description_placeholders={
+                "email": self._email,
+            },
         )
 
     @staticmethod
