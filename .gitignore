@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Personal test files
+test_*.py
+*_test.py
+tests/__pycache__/
+
+# Sensitive data
+*.har
+*.log
+logs_*.log
+
+# Documentation drafts
+NOTES.md
+STATUS.md
+CRITICAL_FINDING.md
+FINAL_STATUS.md
+API_FIXES.md
+IMPLEMENTATION_COMPLETE.md
+PROJECT_SUMMARY.md
+QUICK_START.md
+SOLUTION.md
+ENDPOINT_RESULTS.md
+
+# Claude
+.claude/
