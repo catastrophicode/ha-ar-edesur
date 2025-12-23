@@ -191,7 +191,7 @@ class EdesurOptionsFlow(config_entries.OptionsFlow):
         Args:
             config_entry: Config entry instance
         """
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: Optional[dict[str, Any]] = None
@@ -208,7 +208,7 @@ class EdesurOptionsFlow(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         # Get current supplies
-        current_supplies = self.config_entry.data.get(CONF_SELECTED_SUPPLIES, [])
+        current_supplies = self._config_entry.data.get(CONF_SELECTED_SUPPLIES, [])
 
         return self.async_show_form(
             step_id="init",
@@ -216,11 +216,11 @@ class EdesurOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         "scan_interval",
-                        default=self.config_entry.options.get("scan_interval", 30),
+                        default=self._config_entry.options.get("scan_interval", 30),
                     ): vol.All(vol.Coerce(int), vol.Range(min=5, max=1440)),
                     vol.Optional(
                         "outage_scan_interval",
-                        default=self.config_entry.options.get(
+                        default=self._config_entry.options.get(
                             "outage_scan_interval", 5
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
