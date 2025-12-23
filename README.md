@@ -264,6 +264,7 @@ Use at your own risk. The authors are not responsible for any issues arising fro
 - ✅ Reconfigure flow to add/remove supplies after initial setup
 - ✅ Spanish translations for UI elements
 - ✅ Pre-populated supply selection during reconfiguration
+- ✅ Fixed encryptor attribute inconsistency in API client
 
 ### Version 1.0.0 (Initial Release)
 - ✅ Multi-supply monitoring

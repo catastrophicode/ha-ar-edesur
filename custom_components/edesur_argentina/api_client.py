@@ -245,8 +245,8 @@ class EdesurApiClient:
         _LOGGER.info("Authenticating with Edesur API")
 
         # Encrypt credentials
-        encrypted_email = self._encryptor.encrypt(self.email)
-        encrypted_password = self._encryptor.encrypt(self.password)
+        encrypted_email = self.encryptor.encrypt(self.email)
+        encrypted_password = self.encryptor.encrypt(self.password)
 
         payload = {
             "email": encrypted_email,
@@ -296,7 +296,7 @@ class EdesurApiClient:
         if not self._token:
             await self.authenticate()
 
-        encrypted_username = self._encryptor.encrypt(self.email)
+        encrypted_username = self.encryptor.encrypt(self.email)
 
         payload = {
             "username": encrypted_username,
@@ -363,7 +363,7 @@ class EdesurApiClient:
                     "Please provide DNI during initialization."
                 )
 
-        encrypted_username = self._encryptor.encrypt(self.email)
+        encrypted_username = self.encryptor.encrypt(self.email)
 
         payload = {
             "nroDocumento": self.dni,
@@ -415,7 +415,7 @@ class EdesurApiClient:
             await self.authenticate()
 
         # Encrypt supply ID
-        encrypted_supply_id = self._encryptor.encrypt(supply_id, double_tilde=False)
+        encrypted_supply_id = self.encryptor.encrypt(supply_id, double_tilde=False)
 
         url = f"{API_RETRIEVE_CLIENT}/{encrypted_supply_id}"
         _LOGGER.debug("Getting client details for supply %s", supply_id)
@@ -452,7 +452,7 @@ class EdesurApiClient:
             await self.authenticate()
 
         # Encrypt supply ID
-        encrypted_supply_id = self._encryptor.encrypt(supply_id, double_tilde=False)
+        encrypted_supply_id = self.encryptor.encrypt(supply_id, double_tilde=False)
 
         url = f"{API_ACCOUNT_SUMMARY}/{encrypted_supply_id}"
         _LOGGER.debug("Getting account summary for supply %s", supply_id)
@@ -480,7 +480,7 @@ class EdesurApiClient:
             await self.authenticate()
 
         # Encrypt supply ID
-        encrypted_supply_id = self._encryptor.encrypt(supply_id, double_tilde=False)
+        encrypted_supply_id = self.encryptor.encrypt(supply_id, double_tilde=False)
 
         payload = {
             "nroSuministro": encrypted_supply_id,
@@ -531,7 +531,7 @@ class EdesurApiClient:
             await self.authenticate()
 
         # Encrypt supply ID
-        encrypted_supply_id = self._encryptor.encrypt(supply_id, double_tilde=False)
+        encrypted_supply_id = self.encryptor.encrypt(supply_id, double_tilde=False)
 
         url = f"{API_OUTAGE_VALIDATE}/{encrypted_supply_id}"
         _LOGGER.debug("Validating service cut for supply %s", supply_id)
