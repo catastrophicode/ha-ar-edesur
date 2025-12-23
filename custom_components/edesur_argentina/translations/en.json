@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Edesur Argentina",
+        "description": "Enter your Edesur account credentials",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "select_supplies": {
+        "title": "Select Supply Points",
+        "description": "Select which supply points you want to monitor",
+        "data": {
+          "selected_supplies": "Supply Points"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Supply Points",
+        "description": "Update your supply point selection for {email}",
+        "data": {
+          "selected_supplies": "Supply Points"
+        }
+      }
+    },
+    "error": {
+      "authentication_failed": "Authentication failed. Please check your credentials.",
+      "cannot_connect": "Cannot connect to Edesur servers. Please try again later.",
+      "no_supplies": "No supply points found for this account.",
+      "no_supplies_selected": "Please select at least one supply point.",
+      "unknown_error": "An unexpected error occurred. Please try again."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edesur Argentina Options",
+        "description": "Configure polling intervals",
+        "data": {
+          "scan_interval": "Update interval (minutes)",
+          "outage_scan_interval": "Outage check interval (minutes)"
+        }
+      }
+    }
+  }
+}

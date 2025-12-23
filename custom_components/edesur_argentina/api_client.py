@@ -86,7 +86,7 @@ class EdesurApiClient:
         self._own_session = session is None
         self._token: Optional[str] = None
         self._user_data: Optional[dict[str, Any]] = None
-        self._encryptor = encryptor or EdesurEncryption()
+        self.encryptor = encryptor or EdesurEncryption()
 
     async def __aenter__(self) -> "EdesurApiClient":
         """Async context manager entry."""

@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Edesur Argentina",
+        "description": "Ingrese las credenciales de su cuenta de Edesur",
+        "data": {
+          "email": "Correo electrónico",
+          "password": "Contraseña"
+        }
+      },
+      "select_supplies": {
+        "title": "Seleccionar Suministros",
+        "description": "Seleccione los suministros que desea monitorear",
+        "data": {
+          "selected_supplies": "Suministros"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar Suministros",
+        "description": "Actualice la selección de suministros para {email}",
+        "data": {
+          "selected_supplies": "Suministros"
+        }
+      }
+    },
+    "error": {
+      "authentication_failed": "Falló la autenticación. Por favor, verifique sus credenciales.",
+      "cannot_connect": "No se puede conectar a los servidores de Edesur. Por favor, intente nuevamente más tarde.",
+      "no_supplies": "No se encontraron suministros para esta cuenta.",
+      "no_supplies_selected": "Por favor, seleccione al menos un suministro.",
+      "unknown_error": "Ocurrió un error inesperado. Por favor, intente nuevamente."
+    },
+    "abort": {
+      "already_configured": "Esta cuenta ya está configurada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de Edesur Argentina",
+        "description": "Configure los intervalos de actualización",
+        "data": {
+          "scan_interval": "Intervalo de actualización (minutos)",
+          "outage_scan_interval": "Intervalo de verificación de cortes (minutos)"
+        }
+      }
+    }
+  }
+}
