@@ -161,7 +161,7 @@ class EdesurServiceCutBinarySensor(EdesurSupplyBinarySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator, BINARY_SENSOR_SERVICE_CUT)
-        self._attr_name = "Service Status"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Service Status"
         self._attr_device_class = BinarySensorDeviceClass.PROBLEM
         self._attr_icon = "mdi:power-plug-off"
 
@@ -246,7 +246,7 @@ class EdesurOutageAffectingBinarySensor(EdesurSupplyBinarySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator, BINARY_SENSOR_OUTAGE_AFFECTING)
-        self._attr_name = "Supply Status"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Supply Status"
         self._attr_device_class = BinarySensorDeviceClass.PROBLEM
         self._attr_icon = "mdi:transmission-tower-export"
 

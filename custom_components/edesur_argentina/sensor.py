@@ -197,7 +197,7 @@ class EdesurCustomerNameSensor(EdesurSupplySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, SENSOR_CUSTOMER_NAME)
-        self._attr_name = "Customer Name"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Customer Name"
         self._attr_icon = "mdi:account"
 
     @property
@@ -231,7 +231,7 @@ class EdesurAccountStatusSensor(EdesurSupplySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, SENSOR_ACCOUNT_STATUS)
-        self._attr_name = "Account Status"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Account Status"
         self._attr_icon = "mdi:account-check"
 
     @property
@@ -287,7 +287,7 @@ class EdesurTotalDebtSensor(EdesurSupplySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, SENSOR_TOTAL_DEBT)
-        self._attr_name = "Total Debt"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Total Debt"
         self._attr_icon = "mdi:currency-usd"
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_state_class = SensorStateClass.TOTAL
@@ -370,7 +370,7 @@ class EdesurDueDateSensor(EdesurSupplySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, SENSOR_DUE_DATE)
-        self._attr_name = "Due Date"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Due Date"
         self._attr_icon = "mdi:calendar-clock"
         self._attr_device_class = SensorDeviceClass.DATE
 
@@ -437,7 +437,7 @@ class EdesurLastOutageSensor(EdesurSupplySensorBase):
     def __init__(self, coordinator: EdesurSupplyCoordinator) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, SENSOR_LAST_OUTAGE)
-        self._attr_name = "Last Outage"
+        self._attr_name = f"Edesur Argentina {coordinator.supply_id} Last Outage"
         self._attr_icon = "mdi:power-plug-off"
 
     @property
