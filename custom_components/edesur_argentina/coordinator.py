@@ -136,17 +136,63 @@ class EdesurSupplyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
 
         except EdesurAuthError as err:
-            _LOGGER.error("Authentication error for supply %s: %s", self.supply_id, err)
-            # Trigger reauthentication flow
-            raise UpdateFailed(f"Authentication failed: {err}") from err
+            _LOGGER.warning(
+                "Authentication error for supply %s: %s - keeping last known data",
+                self.supply_id,
+                err,
+            )
+            # Return last known data instead of failing to prevent graph gaps
+            # The reauthentication happens automatically in the API client
+            if self.data:
+                return self.data
+            # If no previous data, return minimal structure
+            return {
+                "supply_id": self.supply_id,
+                "supply_info": self.supply_data,
+                "client_details": {},
+                "account_summary": {},
+                "debt": {},
+                "outage": {},
+                "service_cut": {},
+            }
 
         except EdesurConnectionError as err:
-            _LOGGER.error("Connection error for supply %s: %s", self.supply_id, err)
-            raise UpdateFailed(f"Connection failed: {err}") from err
+            _LOGGER.warning(
+                "Connection error for supply %s: %s - keeping last known data",
+                self.supply_id,
+                err,
+            )
+            # Return last known data for transient connection issues
+            if self.data:
+                return self.data
+            return {
+                "supply_id": self.supply_id,
+                "supply_info": self.supply_data,
+                "client_details": {},
+                "account_summary": {},
+                "debt": {},
+                "outage": {},
+                "service_cut": {},
+            }
 
         except EdesurTimeoutError as err:
-            _LOGGER.error("Timeout error for supply %s: %s", self.supply_id, err)
-            raise UpdateFailed(f"Request timeout: {err}") from err
+            _LOGGER.warning(
+                "Timeout error for supply %s: %s - keeping last known data",
+                self.supply_id,
+                err,
+            )
+            # Return last known data for transient timeout issues
+            if self.data:
+                return self.data
+            return {
+                "supply_id": self.supply_id,
+                "supply_info": self.supply_data,
+                "client_details": {},
+                "account_summary": {},
+                "debt": {},
+                "outage": {},
+                "service_cut": {},
+            }
 
         except EdesurApiError as err:
             _LOGGER.error("API error for supply %s: %s", self.supply_id, err)

@@ -261,6 +261,7 @@ Use at your own risk. The authors are not responsible for any issues arising fro
 - ✅ Fixed encryptor attribute inconsistency in API client
 - ✅ Automatic token refresh on 401 authentication errors
 - ✅ Fixed reauthentication loop prevention for login endpoint
+- ✅ Preserve sensor data during transient errors (prevents graph gaps)
 - ✅ Removed unreliable scheduled outages endpoint
 - ✅ Increased timeout for slow outage endpoints (60s)
 
