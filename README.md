@@ -260,6 +260,7 @@ Use at your own risk. The authors are not responsible for any issues arising fro
 - ✅ Pre-populated supply selection during reconfiguration
 - ✅ Fixed encryptor attribute inconsistency in API client
 - ✅ Automatic token refresh on 401 authentication errors
+- ✅ Fixed reauthentication loop prevention for login endpoint
 - ✅ Removed unreliable scheduled outages endpoint
 - ✅ Increased timeout for slow outage endpoints (60s)
 

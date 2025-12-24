@@ -113,6 +113,7 @@ class EdesurApiClient:
         params: Optional[dict[str, str]] = None,
         retry_count: int = 0,
         timeout_seconds: Optional[int] = None,
+        skip_reauth: bool = False,
     ) -> dict[str, Any]:
         """Make an HTTP request with retry logic.
 
@@ -124,6 +125,7 @@ class EdesurApiClient:
             params: Optional query parameters
             retry_count: Current retry attempt
             timeout_seconds: Optional custom timeout in seconds
+            skip_reauth: Skip reauthentication on 401 (used for login endpoint)
 
         Returns:
             JSON response data
@@ -169,7 +171,8 @@ class EdesurApiClient:
                 # Handle authentication errors
                 if response.status == 401:
                     # Only retry authentication once to avoid infinite loops
-                    if retry_count == 0 and self._token:
+                    # Skip reauthentication for login endpoint itself
+                    if not skip_reauth and retry_count == 0 and self._token:
                         _LOGGER.warning("Token expired (401), attempting reauthentication")
                         try:
                             # Re-authenticate to get a fresh token
@@ -177,7 +180,7 @@ class EdesurApiClient:
                             _LOGGER.info("Reauthentication successful, retrying request")
                             # Retry the request with the new token
                             return await self._request(
-                                method, url, headers, json_data, params, retry_count + 1, timeout_seconds
+                                method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth
                             )
                         except Exception as auth_err:
                             _LOGGER.error("Reauthentication failed: %s", auth_err)
@@ -204,6 +207,8 @@ class EdesurApiClient:
                             json_data,
                             params,
                             retry_count + 1,
+                            timeout_seconds,
+                            skip_reauth,
                         )
                     else:
                         raise EdesurApiError(
@@ -238,7 +243,7 @@ class EdesurApiClient:
                 )
                 await asyncio.sleep(RETRY_DELAY)
                 return await self._request(
-                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds
+                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth
                 )
             raise EdesurTimeoutError(ERROR_TIMEOUT) from err
 
@@ -271,7 +276,8 @@ class EdesurApiClient:
         }
 
         try:
-            response = await self._request("POST", API_LOGIN, json_data=payload)
+            # Use skip_reauth=True to prevent reauthentication loops on login endpoint
+            response = await self._request("POST", API_LOGIN, json_data=payload, skip_reauth=True)
 
             # Extract token and user data
             # The exact response structure may vary - adjust based on actual API
