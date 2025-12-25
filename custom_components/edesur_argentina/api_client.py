@@ -2,6 +2,8 @@
 import asyncio
 import logging
 import ssl
+import time
+import uuid
 from typing import Any, Optional
 
 import aiohttp
@@ -88,6 +90,10 @@ class EdesurApiClient:
         self._user_data: Optional[dict[str, Any]] = None
         self.encryptor = encryptor or EdesurEncryption()
         self._auth_lock = asyncio.Lock()
+        self._last_auth_attempt: float = 0
+        self._last_auth_success: float = 0
+        self._auth_failure_count: int = 0
+        self._auth_in_progress: bool = False
 
     async def __aenter__(self) -> "EdesurApiClient":
         """Async context manager entry."""
@@ -115,6 +121,7 @@ class EdesurApiClient:
         retry_count: int = 0,
         timeout_seconds: Optional[int] = None,
         skip_reauth: bool = False,
+        request_id: Optional[str] = None,
     ) -> dict[str, Any]:
         """Make an HTTP request with retry logic.
 
@@ -137,6 +144,10 @@ class EdesurApiClient:
             EdesurTimeoutError: For timeout errors
             EdesurApiError: For other API errors
         """
+        # Generate request ID if not provided
+        if request_id is None:
+            request_id = str(uuid.uuid4())[:8]
+
         if not self._session:
             raise EdesurConnectionError("Session not initialized")
 
@@ -149,11 +160,16 @@ class EdesurApiClient:
         try:
             # Log full request details
             _LOGGER.info("=" * 80)
-            _LOGGER.info("REQUEST: %s %s", method, url)
-            _LOGGER.info("Headers: %s", request_headers)
-            _LOGGER.info("Payload: %s", json_data)
-            _LOGGER.info("Params: %s", params)
-            _LOGGER.info("Cookies: %s", self._session.cookie_jar if self._session else "None")
+            _LOGGER.info("[%s] REQUEST: %s %s (retry: %d)", request_id, method, url, retry_count)
+            _LOGGER.info("[%s] Has token: %s", request_id, "Yes" if self._token else "No")
+            _LOGGER.info("[%s] Token (first 20 chars): %s", request_id, self._token[:20] + "..." if self._token else "None")
+            _LOGGER.info("[%s] Skip reauth: %s", request_id, skip_reauth)
+            _LOGGER.info("[%s] Auth in progress: %s", request_id, self._auth_in_progress)
+            _LOGGER.info("[%s] Auth failure count: %d", request_id, self._auth_failure_count)
+            _LOGGER.info("[%s] Seconds since last auth attempt: %.1f", request_id, time.time() - self._last_auth_attempt if self._last_auth_attempt else 0)
+            _LOGGER.info("[%s] Headers: %s", request_id, {k: v for k, v in request_headers.items() if k != "Authorization"})
+            _LOGGER.debug("[%s] Payload: %s", request_id, json_data)
+            _LOGGER.debug("[%s] Params: %s", request_id, params)
 
             async with self._session.request(
                 method,
@@ -165,68 +181,133 @@ class EdesurApiClient:
             ) as response:
                 # Log response
                 response_text = await response.text()
-                _LOGGER.info("RESPONSE: Status %d", response.status)
-                _LOGGER.info("Response headers: %s", dict(response.headers))
-                _LOGGER.info("Response body: %s", response_text[:1000])
+                _LOGGER.info("[%s] RESPONSE: Status %d", request_id, response.status)
+                _LOGGER.info("[%s] Response headers: %s", request_id, dict(response.headers))
+                _LOGGER.info("[%s] Response body (first 1000 chars): %s", request_id, response_text[:1000])
                 _LOGGER.info("=" * 80)
                 # Handle authentication errors
                 if response.status == 401:
                     # Only retry authentication once to avoid infinite loops
                     # Skip reauthentication for login endpoint itself
                     if not skip_reauth and retry_count == 0:
-                        _LOGGER.warning("Token expired (401), attempting reauthentication")
+                        _LOGGER.warning("[%s] Token expired (401), attempting reauthentication", request_id)
 
                         # Save the current token before attempting to acquire the lock
                         token_before_lock = self._token
 
+                        # Check if authentication is already failing repeatedly
+                        if self._auth_failure_count >= 3:
+                            time_since_last_attempt = time.time() - self._last_auth_attempt
+                            if time_since_last_attempt < 60:  # Less than 1 minute
+                                _LOGGER.error(
+                                    "[%s] Authentication has failed %d times in the last %.1f seconds. "
+                                    "Refusing to retry to prevent lockout. Please check your credentials.",
+                                    request_id,
+                                    self._auth_failure_count,
+                                    time_since_last_attempt,
+                                )
+                                raise EdesurAuthError("Authentication failing repeatedly, please check credentials")
+
+                        _LOGGER.info("[%s] Waiting to acquire auth lock...", request_id)
+                        lock_acquired_at = time.time()
+
                         # Use lock to prevent multiple concurrent reauthentication attempts
                         async with self._auth_lock:
+                            wait_time = time.time() - lock_acquired_at
+                            _LOGGER.info("[%s] Auth lock acquired after %.2f seconds", request_id, wait_time)
+
                             # Check if token was refreshed while we were waiting for the lock
                             if self._token and self._token != token_before_lock:
-                                _LOGGER.info("Token was refreshed by another request while waiting, retrying request")
+                                _LOGGER.info(
+                                    "[%s] Token was refreshed by another request while waiting (old: %s..., new: %s...), retrying request",
+                                    request_id,
+                                    token_before_lock[:20] if token_before_lock else "None",
+                                    self._token[:20] if self._token else "None",
+                                )
                                 return await self._request(
-                                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth
+                                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth, request_id
                                 )
 
+                            # Check if authentication just failed for another request
+                            if self._auth_in_progress:
+                                _LOGGER.warning(
+                                    "[%s] Another authentication is in progress, waiting...",
+                                    request_id,
+                                )
+                                await asyncio.sleep(1)
+                                if self._token and self._token != token_before_lock:
+                                    _LOGGER.info("[%s] Token refreshed during wait, retrying", request_id)
+                                    return await self._request(
+                                        method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth, request_id
+                                    )
+
                             try:
-                                _LOGGER.info("Starting reauthentication (acquired lock)")
+                                _LOGGER.info("[%s] Starting reauthentication (lock acquired, auth_in_progress: %s)", request_id, self._auth_in_progress)
+                                self._auth_in_progress = True
 
                                 # Clear the old token before reauthenticating
                                 old_token = self._token
+                                _LOGGER.info("[%s] Clearing old token: %s...", request_id, old_token[:20] if old_token else "None")
                                 self._token = None
 
                                 # Re-authenticate to get a fresh token
+                                _LOGGER.info("[%s] Calling authenticate()...", request_id)
                                 await self.authenticate()
 
                                 if self._token and self._token != old_token:
-                                    _LOGGER.info("Reauthentication successful with new token, retrying request")
+                                    _LOGGER.info(
+                                        "[%s] Reauthentication successful with new token (old: %s..., new: %s...), retrying request",
+                                        request_id,
+                                        old_token[:20] if old_token else "None",
+                                        self._token[:20] if self._token else "None",
+                                    )
+                                    self._auth_failure_count = 0  # Reset failure count on success
                                 elif self._token == old_token:
-                                    _LOGGER.warning("Reauthentication returned the same token, this may indicate an issue")
+                                    _LOGGER.warning("[%s] Reauthentication returned the same token, this may indicate an issue", request_id)
                                 else:
-                                    _LOGGER.error("Reauthentication failed: no token received")
+                                    _LOGGER.error("[%s] Reauthentication failed: no token received", request_id)
                                     raise EdesurAuthError("No token received after reauthentication")
 
                                 # Retry the request with the new token
                                 return await self._request(
-                                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth
+                                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth, request_id
                                 )
                             except Exception as auth_err:
-                                _LOGGER.error("Reauthentication failed: %s", auth_err)
+                                _LOGGER.error(
+                                    "[%s] Reauthentication failed: %s (type: %s)",
+                                    request_id,
+                                    auth_err,
+                                    type(auth_err).__name__,
+                                )
+                                self._auth_failure_count += 1
                                 raise EdesurAuthError(ERROR_AUTH_FAILED) from auth_err
+                            finally:
+                                self._auth_in_progress = False
+                                _LOGGER.info("[%s] Auth lock will be released, auth_in_progress set to False", request_id)
                     else:
                         if skip_reauth:
-                            _LOGGER.warning("Authentication failed (401) on login endpoint")
+                            _LOGGER.error(
+                                "[%s] Authentication failed (401) on login endpoint - credentials may be incorrect. Response: %s",
+                                request_id,
+                                response_text[:500],
+                            )
                         elif retry_count > 0:
-                            _LOGGER.warning("Authentication failed (401) after reauthentication attempt")
+                            _LOGGER.error(
+                                "[%s] Authentication failed (401) after reauthentication attempt (retry_count=%d). Response: %s",
+                                request_id,
+                                retry_count,
+                                response_text[:500],
+                            )
                         else:
-                            _LOGGER.warning("Authentication failed (401)")
+                            _LOGGER.warning("[%s] Authentication failed (401)", request_id)
                         raise EdesurAuthError(ERROR_AUTH_FAILED)
 
                 # Handle server errors with retry
                 if response.status >= 500:
                     if retry_count < MAX_RETRIES:
                         _LOGGER.warning(
-                            "Server error %d, retrying in %d seconds (attempt %d/%d)",
+                            "[%s] Server error %d, retrying in %d seconds (attempt %d/%d)",
+                            request_id,
                             response.status,
                             RETRY_DELAY,
                             retry_count + 1,
@@ -242,6 +323,7 @@ class EdesurApiClient:
                             retry_count + 1,
                             timeout_seconds,
                             skip_reauth,
+                            request_id,
                         )
                     else:
                         raise EdesurApiError(
@@ -251,7 +333,7 @@ class EdesurApiClient:
                 # Handle other client errors
                 if response.status >= 400:
                     _LOGGER.error(
-                        "API error %d: %s", response.status, response_text[:200]
+                        "[%s] API error %d: %s", request_id, response.status, response_text[:200]
                     )
                     raise EdesurApiError(
                         f"API error {response.status}: {response_text[:100]}"
@@ -270,22 +352,32 @@ class EdesurApiClient:
         except asyncio.TimeoutError as err:
             if retry_count < MAX_RETRIES:
                 _LOGGER.warning(
-                    "Request timeout, retrying (attempt %d/%d)",
+                    "[%s] Request timeout, retrying (attempt %d/%d)",
+                    request_id,
                     retry_count + 1,
                     MAX_RETRIES,
                 )
                 await asyncio.sleep(RETRY_DELAY)
                 return await self._request(
-                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth
+                    method, url, headers, json_data, params, retry_count + 1, timeout_seconds, skip_reauth, request_id
                 )
+            _LOGGER.error("[%s] Request timeout after %d retries", request_id, MAX_RETRIES)
             raise EdesurTimeoutError(ERROR_TIMEOUT) from err
 
         except ClientError as err:
-            _LOGGER.error("Connection error: %s", err)
+            _LOGGER.error("[%s] Connection error: %s", request_id, err)
             raise EdesurConnectionError(ERROR_CANNOT_CONNECT) from err
 
+        except EdesurAuthError:
+            # Re-raise auth errors without wrapping them
+            raise
+
+        except EdesurApiError:
+            # Re-raise API errors without wrapping them
+            raise
+
         except Exception as err:
-            _LOGGER.error("Unexpected error: %s", err)
+            _LOGGER.error("[%s] Unexpected error in _request: %s (type: %s)", request_id, err, type(err).__name__)
             raise EdesurApiError(f"{ERROR_UNKNOWN}: {err}") from err
 
     async def authenticate(self) -> dict[str, Any]:
@@ -297,16 +389,23 @@ class EdesurApiClient:
         Raises:
             EdesurAuthError: If authentication fails
         """
-        _LOGGER.info("Authenticating with Edesur API (email: %s)", self.email)
-        _LOGGER.debug("Current token before auth: %s", self._token[:20] + "..." if self._token else "None")
+        self._last_auth_attempt = time.time()
+        _LOGGER.info("=" * 80)
+        _LOGGER.info("AUTHENTICATE: Starting authentication with Edesur API")
+        _LOGGER.info("AUTHENTICATE: Email: %s", self.email)
+        _LOGGER.info("AUTHENTICATE: Current token before auth: %s", self._token[:20] + "..." if self._token else "None")
+        _LOGGER.info("AUTHENTICATE: Auth failure count: %d", self._auth_failure_count)
+        _LOGGER.info("AUTHENTICATE: Seconds since last success: %.1f", time.time() - self._last_auth_success if self._last_auth_success else 0)
 
         # Encrypt credentials
         try:
             encrypted_email = self.encryptor.encrypt(self.email)
             encrypted_password = self.encryptor.encrypt(self.password)
-            _LOGGER.debug("Credentials encrypted successfully")
+            _LOGGER.info("AUTHENTICATE: Credentials encrypted successfully")
+            _LOGGER.info("AUTHENTICATE: Encrypted email (first 50 chars): %s", encrypted_email[:50])
+            _LOGGER.info("AUTHENTICATE: Encrypted password length: %d", len(encrypted_password))
         except Exception as err:
-            _LOGGER.error("Failed to encrypt credentials: %s", err)
+            _LOGGER.error("AUTHENTICATE: Failed to encrypt credentials: %s", err)
             raise EdesurAuthError(f"Credential encryption failed: {err}") from err
 
         payload = {
@@ -316,37 +415,48 @@ class EdesurApiClient:
 
         try:
             # Use skip_reauth=True to prevent reauthentication loops on login endpoint
-            _LOGGER.debug("Sending authentication request to %s", API_LOGIN)
+            _LOGGER.info("AUTHENTICATE: Sending authentication request to %s", API_LOGIN)
             response = await self._request("POST", API_LOGIN, json_data=payload, skip_reauth=True)
 
             # Extract token and user data
             # The exact response structure may vary - adjust based on actual API
             if isinstance(response, dict):
-                _LOGGER.debug("Authentication response keys: %s", list(response.keys()))
+                _LOGGER.info("AUTHENTICATE: Authentication response received")
+                _LOGGER.info("AUTHENTICATE: Response keys: %s", list(response.keys()))
+                _LOGGER.info("AUTHENTICATE: Full response: %s", response)
 
                 self._token = response.get("token") or response.get("access_token")
                 self._user_data = response.get("user") or response
 
                 if not self._token:
-                    _LOGGER.warning(
-                        "No token in response, trying to use full response as user data"
+                    _LOGGER.error(
+                        "AUTHENTICATE: No token in response! Response structure: %s",
+                        list(response.keys())
                     )
-                    # Some APIs return the token in a different field or structure
-                    # Log the response structure for debugging
-                    _LOGGER.debug("Login response structure: %s", list(response.keys()))
+                    _LOGGER.error("AUTHENTICATE: Full response for debugging: %s", response)
+                    raise EdesurAuthError("No token received in authentication response")
                 else:
-                    _LOGGER.info("Authentication successful, token received: %s...", self._token[:20])
+                    _LOGGER.info("AUTHENTICATE: ✓ Authentication successful!")
+                    _LOGGER.info("AUTHENTICATE: Token received (first 20 chars): %s...", self._token[:20])
+                    _LOGGER.info("AUTHENTICATE: Token length: %d", len(self._token))
+                    self._last_auth_success = time.time()
+                    self._auth_failure_count = 0
 
+                _LOGGER.info("=" * 80)
                 return self._user_data or response
 
-            _LOGGER.error("Invalid authentication response format: %s", type(response))
+            _LOGGER.error("AUTHENTICATE: Invalid authentication response format: %s", type(response))
             raise EdesurAuthError("Invalid authentication response format")
 
         except EdesurAuthError:
-            _LOGGER.error("Authentication failed with EdesurAuthError")
+            _LOGGER.error("AUTHENTICATE: Authentication failed with EdesurAuthError")
+            self._auth_failure_count += 1
+            _LOGGER.info("=" * 80)
             raise
         except Exception as err:
-            _LOGGER.error("Authentication failed with unexpected error: %s (type: %s)", err, type(err).__name__)
+            _LOGGER.error("AUTHENTICATE: Authentication failed with unexpected error: %s (type: %s)", err, type(err).__name__)
+            self._auth_failure_count += 1
+            _LOGGER.info("=" * 80)
             raise EdesurAuthError(f"Authentication failed: {err}") from err
 
     async def get_profile(self, use_cache: bool = False) -> dict[str, Any]:
