@@ -250,6 +250,17 @@ class EdesurApiClient:
                                 _LOGGER.info("[%s] Clearing old token: %s...", request_id, old_token[:20] if old_token else "None")
                                 self._token = None
 
+                                # Clear session cookies to ensure clean reauthentication
+                                # The session might have cookies/state from previous requests that interfere
+                                if self._session and hasattr(self._session, 'cookie_jar'):
+                                    cookie_count = len(self._session.cookie_jar)
+                                    self._session.cookie_jar.clear()
+                                    _LOGGER.warning(
+                                        "[%s] Cleared %d session cookies before reauthentication (stale session state can cause login failures)",
+                                        request_id,
+                                        cookie_count,
+                                    )
+
                                 # Re-authenticate to get a fresh token
                                 _LOGGER.info("[%s] Calling authenticate()...", request_id)
                                 await self.authenticate()
