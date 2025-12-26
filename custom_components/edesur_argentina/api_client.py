@@ -273,6 +273,12 @@ class EdesurApiClient:
                                         self._token[:20] if self._token else "None",
                                     )
                                     self._auth_failure_count = 0  # Reset failure count on success
+
+                                    # Add a small delay to allow session propagation through CDN/API gateway
+                                    # Without this, requests immediately after authentication fail with 401
+                                    # even though the token is valid, due to CDN caching/session sync issues
+                                    _LOGGER.info("[%s] Waiting 2 seconds for session to propagate through CDN...", request_id)
+                                    await asyncio.sleep(2)
                                 elif self._token == old_token:
                                     _LOGGER.warning("[%s] Reauthentication returned the same token, this may indicate an issue", request_id)
                                 else:
