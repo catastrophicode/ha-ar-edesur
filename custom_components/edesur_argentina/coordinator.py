@@ -80,15 +80,38 @@ class EdesurSupplyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return_exceptions=True,
             )
 
-            # Build combined data dictionary
+            # Build combined data dictionary, preserving last known values on failure
+            # Get previous data to preserve last known good values
+            previous_data = self.data or {}
+
             data = {
                 "supply_id": self.supply_id,
                 "supply_info": self.supply_data,
-                "client_details": {} if isinstance(client_details, Exception) else client_details,
-                "account_summary": {} if isinstance(account_summary, Exception) else account_summary,
-                "debt": {} if isinstance(debt, Exception) else debt,
-                "outage": {} if isinstance(outage, Exception) else outage,
-                "service_cut": {} if isinstance(service_cut, Exception) else service_cut,
+                "client_details": (
+                    previous_data.get("client_details", {})
+                    if isinstance(client_details, Exception)
+                    else client_details
+                ),
+                "account_summary": (
+                    previous_data.get("account_summary", {})
+                    if isinstance(account_summary, Exception)
+                    else account_summary
+                ),
+                "debt": (
+                    previous_data.get("debt", {})
+                    if isinstance(debt, Exception)
+                    else debt
+                ),
+                "outage": (
+                    previous_data.get("outage", {})
+                    if isinstance(outage, Exception)
+                    else outage
+                ),
+                "service_cut": (
+                    previous_data.get("service_cut", {})
+                    if isinstance(service_cut, Exception)
+                    else service_cut
+                ),
             }
 
             # Debug logging for client details
@@ -99,8 +122,11 @@ class EdesurSupplyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     client_details.get("Nombre"),
                     client_details.get("MarcaMedidor"),
                 )
-            else:
-                _LOGGER.warning("No client details available for supply %s", self.supply_id)
+            elif isinstance(client_details, Exception):
+                _LOGGER.warning(
+                    "Client details fetch failed for supply %s, preserving last known data",
+                    self.supply_id,
+                )
 
             # Log any errors but don't fail the entire update
             for key, value in [
@@ -112,7 +138,7 @@ class EdesurSupplyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ]:
                 if isinstance(value, Exception):
                     _LOGGER.warning(
-                        "Failed to fetch %s for supply %s: %s",
+                        "Failed to fetch %s for supply %s: %s - preserving last known data",
                         key,
                         self.supply_id,
                         value,
