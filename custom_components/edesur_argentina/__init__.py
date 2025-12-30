@@ -48,9 +48,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     password = entry.data[CONF_PASSWORD]
     selected_supplies = entry.data.get(CONF_SELECTED_SUPPLIES, [])
 
-    # Get scan intervals from options
-    scan_interval = entry.options.get("scan_interval", 30)
-    outage_scan_interval = entry.options.get("outage_scan_interval", 5)
+    # Get scan intervals from options (in hours for scan_interval, minutes for outages)
+    scan_interval = entry.options.get("scan_interval", 24)  # Default 24 hours for account data
+    outage_scan_interval = entry.options.get("outage_scan_interval", 5)  # Default 5 minutes for outages
 
     # Create aiohttp session
     session = aiohttp_client.async_get_clientsession(hass)
@@ -117,8 +117,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             supply_data=supply,
         )
 
-        # Update interval from options
-        coordinator.update_interval = timedelta(minutes=scan_interval)
+        # Update interval from options (scan_interval is in hours)
+        coordinator.update_interval = timedelta(hours=scan_interval)
 
         # Perform initial data fetch
         await coordinator.async_config_entry_first_refresh()

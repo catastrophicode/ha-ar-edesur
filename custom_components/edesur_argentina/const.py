@@ -10,9 +10,10 @@ CONF_DOCUMENT_TYPE: Final = "document_type"
 CONF_SELECTED_SUPPLIES: Final = "selected_supplies"
 
 # Default values
-DEFAULT_SCAN_INTERVAL: Final = timedelta(minutes=30)
-DEFAULT_OUTAGE_SCAN_INTERVAL: Final = timedelta(minutes=5)
+DEFAULT_SCAN_INTERVAL: Final = timedelta(hours=24)  # Daily updates for account data
+DEFAULT_OUTAGE_SCAN_INTERVAL: Final = timedelta(minutes=5)  # Frequent updates for outages
 DEFAULT_TIMEOUT: Final = 30
+REQUEST_DELAY: Final = 0.5  # Delay between API requests to avoid rate limiting (seconds)
 
 # API Endpoints
 API_BASE_URL: Final = "https://ed.edesur.com.ar/api"

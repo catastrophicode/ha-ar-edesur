@@ -17,6 +17,7 @@ from .const import (
     DEFAULT_OUTAGE_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    REQUEST_DELAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,22 +64,42 @@ class EdesurSupplyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             _LOGGER.debug("Updating data for supply %s", self.supply_id)
 
-            # Fetch all supply-specific data in parallel
-            client_details_task = self.client.get_client_details(self.supply_id)
-            account_summary_task = self.client.get_account_summary(self.supply_id)
-            debt_task = self.client.get_debt(self.supply_id)
-            outage_task = self.client.get_outage_by_client(self.supply_id)
-            service_cut_task = self.client.validate_service_cut(self.supply_id)
+            # Fetch supply-specific data sequentially with delays to avoid rate limiting
+            # Making all requests in parallel can trigger 400 errors from the API
+            client_details = None
+            account_summary = None
+            debt = None
+            outage = None
+            service_cut = None
 
-            # Wait for all requests to complete
-            client_details, account_summary, debt, outage, service_cut = await asyncio.gather(
-                client_details_task,
-                account_summary_task,
-                debt_task,
-                outage_task,
-                service_cut_task,
-                return_exceptions=True,
-            )
+            try:
+                client_details = await self.client.get_client_details(self.supply_id)
+                await asyncio.sleep(REQUEST_DELAY)
+            except Exception as err:
+                client_details = err
+
+            try:
+                account_summary = await self.client.get_account_summary(self.supply_id)
+                await asyncio.sleep(REQUEST_DELAY)
+            except Exception as err:
+                account_summary = err
+
+            try:
+                debt = await self.client.get_debt(self.supply_id)
+                await asyncio.sleep(REQUEST_DELAY)
+            except Exception as err:
+                debt = err
+
+            try:
+                outage = await self.client.get_outage_by_client(self.supply_id)
+                await asyncio.sleep(REQUEST_DELAY)
+            except Exception as err:
+                outage = err
+
+            try:
+                service_cut = await self.client.validate_service_cut(self.supply_id)
+            except Exception as err:
+                service_cut = err
 
             # Build combined data dictionary, preserving last known values on failure
             # Get previous data to preserve last known good values
